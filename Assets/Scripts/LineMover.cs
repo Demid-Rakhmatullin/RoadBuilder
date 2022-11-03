@@ -1,5 +1,7 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
+using UniRx;
 using UnityEngine;
 using UnityEngine.U2D;
 
@@ -10,9 +12,12 @@ public class LineMover : MonoBehaviour
 
     private float t;
     private Vector2 currentPos;
-    private float speed;
+    [SerializeField] private float speed;
     private int routeToGo;
     private bool coroutineAllowed;
+
+    private Transform[] nextRoutes;
+    public IReactiveProperty<bool> NextSegment = new ReactiveProperty<bool>();
 
     // Start is called before the first frame update
     void Start()
@@ -21,8 +26,20 @@ public class LineMover : MonoBehaviour
         //var v1 = con.spline.GetLeftTangent(0);
         //Debug.Log(v.x + " " + v1.x);
 
-        speed = 0.5f;
+        //speed = 0.5f;
+    }
+
+    public void StartTravel()
+    {
+        if (routes == null || routes.Length == 0)
+            routes = nextRoutes;
+
         coroutineAllowed = true;
+    }
+
+    public void SetRoutes(Transform[] routes)
+    {
+        nextRoutes = routes;
     }
 
     // Update is called once per frame
@@ -40,6 +57,8 @@ public class LineMover : MonoBehaviour
         var p1 = routes[routeNum].GetChild(1).position;
         var p2 = routes[routeNum].GetChild(2).position;
         var p3 = routes[routeNum].GetChild(3).position;
+
+        //Debug.Log("Move " + routeNum);
 
         //var p0 = con.spline.GetPosition(0);
         //var p1 = con.spline.GetRightTangent(0);
@@ -63,8 +82,19 @@ public class LineMover : MonoBehaviour
 
         routeToGo++;
         if (routeToGo > routes.Length - 1)
-            routeToGo = 0;
-
-        coroutineAllowed = true;
+        {
+            if (nextRoutes != null && nextRoutes.Length > 0)
+            {
+                routes = nextRoutes;
+                routeToGo = 0;
+                nextRoutes = null;
+                NextSegment.Value = true;
+            }
+            else
+                Destroy(gameObject);
+            //routeToGo = 0;
+        }
+        else
+            coroutineAllowed = true;
     }
 }
