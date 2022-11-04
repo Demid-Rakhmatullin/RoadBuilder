@@ -1,10 +1,7 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 
-public class Route : MonoBehaviour
+public class BezierCurve : MonoBehaviour
 {
-
     [SerializeField] Transform[] controlPoints;
 
     private Vector2 gizomsPos;

@@ -1,52 +1,43 @@
 using System;
 using System.Collections;
-using System.Collections.Generic;
 using UniRx;
 using UnityEngine;
-using UnityEngine.U2D;
 
-public class LineMover : MonoBehaviour
+public class Traveller : MonoBehaviour
 {
-    //public SpriteShapeController con;
-    public Transform[] routes;
+    [SerializeField] Transform[] routes;
+    [SerializeField] float speed;
 
     private float t;
-    private Vector2 currentPos;
-    [SerializeField] private float speed;
+    private Vector2 hiddenPos = new Vector3(-100, -100, -100);
     private int routeToGo;
     private bool coroutineAllowed;
-
     private Transform[] nextRoutes;
-    public IReactiveProperty<bool> NextSegment = new ReactiveProperty<bool>();
 
-    // Start is called before the first frame update
-    void Start()
+    private readonly Subject<bool> onNextSegment = new Subject<bool>();
+    public IObservable<bool> OnNextSegment { get => onNextSegment; }
+
+    void Update()
     {
-        //var v = con.spline.GetPosition(0);
-        //var v1 = con.spline.GetLeftTangent(0);
-        //Debug.Log(v.x + " " + v1.x);
-
-        //speed = 0.5f;
+        if (coroutineAllowed)
+            StartCoroutine(Move(routeToGo));
     }
 
     public void StartTravel()
     {
         if (routes == null || routes.Length == 0)
+        {
             routes = nextRoutes;
+            nextRoutes = null;
+        }
 
+        transform.position = hiddenPos;
         coroutineAllowed = true;
     }
 
-    public void SetRoutes(Transform[] routes)
-    {
-        nextRoutes = routes;
-    }
-
-    // Update is called once per frame
-    void Update()
-    {
-        if (coroutineAllowed)
-            StartCoroutine(Move(routeToGo));
+    public void SetNextRoutes(Transform[] routes)
+    { 
+        nextRoutes = routes != null ? (Transform[])routes.Clone() : null;
     }
 
     private IEnumerator Move(int routeNum)
@@ -58,18 +49,11 @@ public class LineMover : MonoBehaviour
         var p2 = routes[routeNum].GetChild(2).position;
         var p3 = routes[routeNum].GetChild(3).position;
 
-        //Debug.Log("Move " + routeNum);
-
-        //var p0 = con.spline.GetPosition(0);
-        //var p1 = con.spline.GetRightTangent(0);
-        //var p2 = con.spline.GetLeftTangent(1);
-        //var p3 = con.spline.GetPosition(1);
-
         while (t < 1)
         {
             t += Time.deltaTime * speed;
 
-            currentPos = Mathf.Pow(1 - t, 3) * p0 +
+            var currentPos = Mathf.Pow(1 - t, 3) * p0 +
                 3 * Mathf.Pow(1 - t, 2) * t * p1 +
                 3 * (1 - t) * Mathf.Pow(t, 2) * p2 +
                 Mathf.Pow(t, 3) * p3;
@@ -87,12 +71,14 @@ public class LineMover : MonoBehaviour
             {
                 routes = nextRoutes;
                 routeToGo = 0;
-                nextRoutes = null;
-                NextSegment.Value = true;
+                nextRoutes = null;                
+                onNextSegment.OnNext(true);
             }
             else
+            {
                 Destroy(gameObject);
-            //routeToGo = 0;
+                onNextSegment.OnNext(false);
+            }
         }
         else
             coroutineAllowed = true;

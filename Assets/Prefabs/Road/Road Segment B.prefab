@@ -910,6 +910,14 @@ PrefabInstance:
     m_TransformParent: {fileID: 0}
     m_Modifications:
     - target: {fileID: 4215622858650572204, guid: 897dcbdb3cac84241b813682a0cdd801, type: 3}
+      propertyPath: connectionTop
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 4215622858650572204, guid: 897dcbdb3cac84241b813682a0cdd801, type: 3}
+      propertyPath: connectionBottom
+      value: 2
+      objectReference: {fileID: 0}
+    - target: {fileID: 4215622858650572204, guid: 897dcbdb3cac84241b813682a0cdd801, type: 3}
       propertyPath: routes.Array.size
       value: 4
       objectReference: {fileID: 0}
