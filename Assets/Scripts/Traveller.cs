@@ -12,14 +12,22 @@ public class Traveller : MonoBehaviour
     private Vector2 hiddenPos = new Vector3(-100, -100, -100);
     private int routeToGo;
     private bool coroutineAllowed;
+    private IReadOnlyReactiveProperty<bool> paused;
     private Transform[] nextRoutes;
 
     private readonly Subject<bool> onNextSegment = new Subject<bool>();
     public IObservable<bool> OnNextSegment { get => onNextSegment; }
 
+    void Start()
+    {
+        paused = GameController.CurrentState
+            .Select(s => s == GameState.Paused)
+            .ToReactiveProperty();
+    }
+
     void Update()
     {
-        if (coroutineAllowed)
+        if (coroutineAllowed && !paused.Value)
             StartCoroutine(Move(routeToGo));
     }
 
@@ -51,14 +59,17 @@ public class Traveller : MonoBehaviour
 
         while (t < 1)
         {
-            t += Time.deltaTime * speed;
+            if (!paused.Value)
+            {
+                t += Time.deltaTime * speed;
 
-            var currentPos = Mathf.Pow(1 - t, 3) * p0 +
-                3 * Mathf.Pow(1 - t, 2) * t * p1 +
-                3 * (1 - t) * Mathf.Pow(t, 2) * p2 +
-                Mathf.Pow(t, 3) * p3;
+                var currentPos = Mathf.Pow(1 - t, 3) * p0 +
+                    3 * Mathf.Pow(1 - t, 2) * t * p1 +
+                    3 * (1 - t) * Mathf.Pow(t, 2) * p2 +
+                    Mathf.Pow(t, 3) * p3;
 
-            transform.position = currentPos;
+                transform.position = currentPos;
+            }
             yield return new WaitForEndOfFrame();
         }
 

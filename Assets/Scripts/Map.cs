@@ -1,14 +1,14 @@
 using System;
-using System.Collections;
-using System.Collections.Generic;
 using System.Linq;
 using UniRx;
-using UniRx.Triggers;
 using UnityEngine;
 using UnityEngine.UI;
 
 public class Map : MonoBehaviour
 {
+    [SerializeField] int minCompleteCount;
+    [SerializeField] int maxCompleteCount;
+
     [SerializeField] float topY;
     [SerializeField] float bottomY;
     [SerializeField] GameObject startSegmentPrefab;
@@ -23,11 +23,13 @@ public class Map : MonoBehaviour
     private bool isSwapping;
     private Traveller traveler;
     private int winSegmentsCount;
+    private bool gameStarted;
 
     private RouteSegment currentSegment;
     private RouteSegment nextSegment;
 
     private readonly IReactiveProperty<int> reaminingSegmentsCount = new ReactiveProperty<int>();
+    private readonly IReactiveProperty<bool> buttonsActive = new ReactiveProperty<bool>();
 
     private readonly Subject<int> onScoreChange = new Subject<int>();
     public IObservable<int> OnScoreChange { get => onScoreChange; }
@@ -37,23 +39,13 @@ public class Map : MonoBehaviour
 
     void Start()
     {
-        winSegmentsCount = UnityEngine.Random.Range(5, 16);
-        reaminingSegmentsCount.Value = winSegmentsCount;
+        
         reaminingSegmentsCount.SubscribeToText(remainingSegmentsCounter);
-        IsWin = reaminingSegmentsCount.Select(v => v == 0).ToReactiveProperty();
+        IsWin = reaminingSegmentsCount
+            .Where(_ => GameController.CurrentState.Value == GameState.Active)
+            .Select(v => v == 0).ToReactiveProperty();
         IsWin.Where(win => win == true)
-            .Subscribe(_ => ShowWin());
-
-
-        yDelta = topY - bottomY;
-        startPos = transform.position;
-
-        currentSegment = Instantiate(startSegmentPrefab, transform).GetComponent<RouteSegment>();
-        currentSegment.transform.localPosition = new Vector2(0, topY);
-
-        traveler = Instantiate(travelerPrefab, transform).GetComponent<Traveller>();
-        traveler.SetNextRoutes(currentSegment.Routes);
-        traveler.StartTravel();
+            .Subscribe(_ => ShowWin());        
 
         foreach (var btn in nextSegmentButtons)
         {
@@ -64,25 +56,63 @@ public class Map : MonoBehaviour
                         var nextSegmentPrefab = btn.GetComponent<NextSegmentBtn>().NextSegmentPrefab;
                         PlaceNextSegment(nextSegmentPrefab);
                     });
-        }
 
-        traveler.OnNextSegment
-            .Where(ns => ns == true)
-            .Subscribe(_ =>
-                {
-                    SwapSegments();
-                    onScoreChange.OnNext(100);
-                });
+            buttonsActive.SubscribeToInteractable(btn);
+        }      
 
-        traveler.OnNextSegment
-           .Where(ns => ns == false)
-           .Subscribe(_ => 
-               { 
-                   DisableMap(() => loseText.gameObject.SetActive(true));
-                   IsLose.Value = true;                   
-               });
+        GameController.CurrentState.Where(s => s == GameState.Active && !gameStarted)
+            .Subscribe(_ => StartGame());
+
+        GameController.CurrentState.Where(s => s == GameState.Stopped)
+            .Subscribe(_ => gameStarted = false);
     }
     
+    private void StartGame()
+    {
+        winText.gameObject.SetActive(false);
+        loseText.gameObject.SetActive(false);
+
+        IsLose.Value = false;
+
+        winSegmentsCount = UnityEngine.Random.Range(minCompleteCount, maxCompleteCount + 1);
+        reaminingSegmentsCount.Value = winSegmentsCount;
+
+        yDelta = topY - bottomY;
+        startPos = transform.position;
+
+        LeanTween.delayedCall(0.5f, () =>
+        {
+            currentSegment = Instantiate(startSegmentPrefab, transform).GetComponent<RouteSegment>();
+            currentSegment.transform.localPosition = new Vector2(0, topY);
+
+            traveler = Instantiate(travelerPrefab, transform).GetComponent<Traveller>();
+            traveler.SetNextRoutes(currentSegment.Routes);
+            traveler.StartTravel();
+
+            traveler.OnNextSegment
+               .Where(ns => ns == true)
+               .Subscribe(_ =>
+               {
+                   SwapSegments();
+                   onScoreChange.OnNext(100);
+               });
+
+            traveler.OnNextSegment
+               .Where(ns => ns == false)
+               .Subscribe(_ =>
+               {
+                   DisableMap(() =>
+                   {
+                       loseText.gameObject.SetActive(true);
+                       IsLose.Value = true;
+                   });
+               });
+
+            buttonsActive.Value = true;
+            gameStarted = true;
+        });
+    }
+
     private void PlaceNextSegment(GameObject nextSegmentPrefab)
     {
         if (nextSegment != null)
@@ -124,13 +154,11 @@ public class Map : MonoBehaviour
 
     private void DisableMap(Action onComplete)
     {
-        foreach (var btn in nextSegmentButtons)
-            btn.interactable = false;
-
+        buttonsActive.Value = false;
         FadeSegment(currentSegment).setOnComplete(onComplete);
         if (nextSegment != null)
             FadeSegment(nextSegment);
-    }
+    }    
 
     private LTDescr FadeSegment(RouteSegment segment)
         => LeanTween.alpha(segment.gameObject, 0f, 0.5f).setDestroyOnComplete(true);
