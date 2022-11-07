@@ -37,13 +37,17 @@ public class Map : MonoBehaviour
     public IReadOnlyReactiveProperty<bool> IsWin;
     public IReactiveProperty<bool> IsLose = new ReactiveProperty<bool>();
 
-    void Start()
+    private void Awake()
     {
-        
-        reaminingSegmentsCount.SubscribeToText(remainingSegmentsCounter);
         IsWin = reaminingSegmentsCount
             .Where(_ => GameController.CurrentState.Value == GameState.Active)
-            .Select(v => v == 0).ToReactiveProperty();
+            .Select(v => v == 0)
+            .ToReactiveProperty();
+    }
+
+    void Start()
+    {      
+        reaminingSegmentsCount.SubscribeToText(remainingSegmentsCounter);     
         IsWin.Where(win => win == true)
             .Subscribe(_ => ShowWin());        
 
